@@ -2,26 +2,57 @@
   <div id="app">
     <div class="form">
       <div class="left-side">
-        <div class="operators">
-          <button :class="operator == 'robi' ? 'active':'inactive' " @click="setOperator('robi')">Robi</button>
-          <button :class="operator == 'airtel' ? 'active':'inactive' " @click="setOperator('airtel')">Airtel</button>
+        <div v-if="!isSearching" class="operators">
+          <button
+            :class="operator == 'robi' ? 'active' : 'inactive'"
+            @click="setOperator('robi')"
+          >
+            Robi
+          </button>
+          <button
+            :class="operator == 'airtel' ? 'active' : 'inactive'"
+            @click="setOperator('airtel')"
+          >
+            Airtel
+          </button>
         </div>
 
-        <div class="input_area">
-          <span>{{ operator == 'airtel' ? '01601':'01886' }}</span>
-          <input type="number" v-model="start_sufix" />
-          <button @click="startSearch()">Search</button>
-        </div>
+        <h1 v-if="operator && isValidNumber && isSearching">
+          {{ !isSearching ? "Number" : "Checking" }}: {{ searchNumber }}
+        </h1>
+
+        <form v-if="operator && !isSearching" @submit.prevent="searchNumbers">
+          <div class="input_area">
+            <input
+              :class="{ valid: isValidNumber }"
+              type="number"
+              v-model="searchNumber"
+            />
+            <button type="submit">Search</button>
+          </div>
+        </form>
+        <br />
+        <button
+          v-if="isSearching"
+          class="btn btn-danger"
+          @click="isSearching = false"
+        >
+          Stop Searcing
+        </button>
+        <br />
+        <button v-if="collected_numbers.length" @click="collected_numbers = []">
+          Clear History
+        </button>
       </div>
       <div style="display: block">
         <h1>Available Number List</h1>
-        <ol>
-          <li v-for="number in numbers" :key="number.simNumber">
+        <ul>
+          <li v-for="number in collected_numbers" :key="number.simNumber">
             <span :class="{ valid: number.available }">{{
               number.simNumber
             }}</span>
           </li>
-        </ol>
+        </ul>
       </div>
     </div>
   </div>
@@ -33,78 +64,58 @@ export default {
 
   data() {
     return {
-      start_sufix: 6,
-      operator:'robi',
-      number: null,
-      numbers: [
-        // {
-        //   simNumber: 1234567,
-        //   available: true,
-        // },
-      ],
-      isSearching: null,
+      operator: null,
+      searchNumber: null,
+      collected_numbers: [],
       status: null,
+      isSearching: null,
     };
   },
 
   methods: {
-    setOperator(value){
-      this.operator = value
+    setOperator(name) {
+      this.operator = name; // robi or airtel
+      this.searchNumber = name == "robi" ? "018866" : "01601";
     },
 
-    startSearch() {
-      this.collectingAvailableNumbers();
-    },
+    async searchNumbers() {
+      if (this.searchNumber && this.searchNumber.toString().length == 11) {
+        let url = `https://da.robi.com.bd/api/v1/check/${this.searchNumber}/PREPAID`;
 
-    collectingAvailableNumbers() {
-      if (this.start_sufix.toString().length == 6) {
-        let url = `https://da.robi.com.bd/api/v1/check/${this.number}/PREPAID`;
-        fetch(url)
-          .then((response) => {
-            if (response.status === 200) {
-              return response.json();
-            } else {
-              console.log("server error");
-            }
-          })
-          .then((response) => {
-            if (response.message == null) {
-              this.status = "Available";
-              this.numbers.push({
-                simNumber: this.number,
+        this.status = "Checking";
+        this.isSearching = true;
+        await fetch(url)
+          .then((res) => res.json())
+          .then((res) => {
+            if (res.isSuccess && !res.message) {
+              this.collected_numbers.unshift({
+                id: this.searchNumber,
+                simNumber: this.searchNumber,
                 available: true,
               });
             } else {
-              this.status = "Not Available";
-              this.numbers.push({
-                id: this.number,
+              this.collected_numbers.unshift({
+                id: this.searchNumber,
+                simNumber: this.searchNumber,
                 available: false,
-                simNumber: this.number,
               });
             }
-            this.start_sufix++;
           })
-          .catch((err) => {
-            console.log(err);
-          });
+          .catch((e) => console.log(e));
+
+        if (this.isSearching) {
+          this.searchNumber = `0${parseInt(this.searchNumber) + 1}`;
+          this.searchNumbers();
+        }
       } else {
-        console.warn(
-          "Wrong input value: " + this.start_sufix.toString().length
-        );
+        alert("The number must be a valid (11 digit) number");
       }
     },
   },
 
-  watch: {
-    start_sufix() {
-      if (this.start_sufix.toString().length == 6) {
-        this.status = "Checking";
-        this.number = `01886${this.start_sufix}`;
-        console.log(this.number);
-        // setTimeout(() => {
-        this.collectingAvailableNumbers();
-        // }, 100);
-      }
+  computed: {
+    isValidNumber() {
+      return this.searchNumber.toString().length == 11;
     },
   },
 };
@@ -131,8 +142,8 @@ export default {
   align-items: center;
 }
 
-.operators button{
- margin: 0 20px;
+.operators button {
+  margin: 0 20px;
 }
 
 .input_area {
@@ -141,10 +152,11 @@ export default {
 }
 
 .form input {
-  padding: 10px 4px;
   outline: none;
-  border: 2px solid rgb(226, 226, 226);
-  font-size: 18px;
+  border: 2px solid rgb(195 90 221);
+  border-radius: 5px 0 0 5px;
+  padding: 10px;
+  border-right: none;
 }
 
 .input_area span {
@@ -168,6 +180,10 @@ button.active {
   background: #0099d3;
 }
 
+button.btn-danger {
+  background: #ff0faf;
+}
+
 button.inactive {
   background: #cdcdcd;
 }
@@ -179,26 +195,25 @@ button:disabled {
   background: rgb(199, 199, 199);
 }
 
-.form ol {
+.form ul {
   height: 400px;
-  background: rgb(138 255 219);
-  overflow: overlay;
+  overflow: scroll;
 }
 
-ol li {
-  font-weight: bold;
+ul li {
   font-size: 20pt;
+}
+
+input.valid {
+  border-color: green;
+}
+
+input.invalid {
+  border-color: red;
+  background-color: rosybrown;
 }
 
 .valid {
-  color: green;
-  font-size: 20pt;
-  font-weight: bold;
-}
-
-.invalid {
-  color: red;
-  font-size: 20pt;
-  font-weight: bold;
+  color: rgb(25, 87, 255);
 }
 </style>
