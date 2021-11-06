@@ -24,6 +24,12 @@
         <form v-if="operator && !isSearching" @submit.prevent="searchNumbers">
           <div class="input_area">
             <input
+              type="number"
+              v-model="incrementNumber"
+              class="incrementNumber"
+              placeholder="1"
+            />
+            <input
               :class="{ valid: isValidNumber }"
               type="number"
               v-model="searchNumber"
@@ -66,6 +72,7 @@ export default {
     return {
       operator: null,
       searchNumber: null,
+      incrementNumber: 1,
       collected_numbers: [],
       status: null,
       isSearching: null,
@@ -75,11 +82,15 @@ export default {
   methods: {
     setOperator(name) {
       this.operator = name; // robi or airtel
-      this.searchNumber = name == "robi" ? "018866" : "01601";
+      this.searchNumber = name == "robi" ? "01886" : "01601";
     },
 
     async searchNumbers() {
-      if (this.searchNumber && this.searchNumber.toString().length == 11) {
+      if (
+        this.searchNumber &&
+        this.incrementNumber &&
+        this.searchNumber.toString().length == 11
+      ) {
         let url = `https://da.robi.com.bd/api/v1/check/${this.searchNumber}/PREPAID`;
 
         this.status = "Checking";
@@ -88,25 +99,28 @@ export default {
           .then((res) => res.json())
           .then((res) => {
             if (res.isSuccess && !res.message) {
+              this.status = "Congratulations, New Number Available";
               this.collected_numbers.unshift({
                 id: this.searchNumber,
                 simNumber: this.searchNumber,
                 available: true,
               });
             } else {
-              this.collected_numbers.unshift({
-                id: this.searchNumber,
-                simNumber: this.searchNumber,
-                available: false,
-              });
+              this.status = "Not Available";
+              // this.collected_numbers.unshift({
+              //   id: this.searchNumber,
+              //   simNumber: this.searchNumber,
+              //   available: false,
+              // });
+            }
+          })
+          .then(() => {
+            if (this.isSearching) {
+              this.searchNumber = this.newNumber;
+              this.searchNumbers();
             }
           })
           .catch((e) => console.log(e));
-
-        if (this.isSearching) {
-          this.searchNumber = `0${parseInt(this.searchNumber) + 1}`;
-          this.searchNumbers();
-        }
       } else {
         alert("The number must be a valid (11 digit) number");
       }
@@ -117,12 +131,16 @@ export default {
     isValidNumber() {
       return this.searchNumber.toString().length == 11;
     },
+
+    newNumber() {
+      return `0${parseInt(this.searchNumber) + parseInt(this.incrementNumber)}`;
+    },
   },
 };
 </script>
 
 <!-- CSS libraries -->
-<style src="normalize.css/normalize.css"></style>
+// <style src="normalize.css/normalize.css"></style>
 
 <!-- Global CSS -->
 <style>
@@ -157,6 +175,14 @@ export default {
   border-radius: 5px 0 0 5px;
   padding: 10px;
   border-right: none;
+}
+
+.form input.incrementNumber {
+  background-color: #efefef;
+  width: 10%;
+  margin-right: 10 px;
+  border-right: 2 px solid #c35add;
+  border-radius: 4 px;
 }
 
 .input_area span {
